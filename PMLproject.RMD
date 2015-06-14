@@ -1,0 +1,161 @@
+---
+title: "PML Project 1"
+author: "claudio freitas"
+date: "Tuesday, June 09, 2015"
+output: html_document
+---
+##Final Project Practical Machine Learning
+
+Below is the final project for the Practical Machine Learning course. The project was developed in a Windows 7 platformwith R studio Version 0.98.1087.
+
+##Executive Summary
+
+The project uses data collected with devices such as Jawbone Up, Nike FuelBand, and Fitbit. According to the project background written in the course´s website the "goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways". The goal of the project is try to quantify how well the exercise is done with the variable "Classe".
+
+##Data Source
+
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+##Data Collection and reproducibility
+
+Collecting data and ensuring reproducibility.
+
+```{r, echo=TRUE}
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+set.seed(2133459)
+
+trainurl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testurl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+train <- read.csv(trainurl, na.strings=c("NA", "#DIV/0!","" ))
+test <- read.csv(testurl, na.strings=c("NA", "#DIV/0!","" ))
+str(train)
+```
+
+##Cleaning Variables
+
+First we have to exclude the first 7 colunms that will not be helpful in the model.
+
+```{r, echo=TRUE}
+train <- train[,-c(1:7)]
+test <- test[,-c(1:7)]
+dim(train)
+```
+
+From the above data it is clear that there are many variables with NAs that should be extracted from the test data. But first we have to deal with near zero values that have no meaning in the prediction, we will use the nearZeroVar function:
+
+```{r, echo=TRUE}
+nzvtrain <- nearZeroVar(train, saveMetrics=T)
+newtrain <- train[, nzvtrain$nzv==F]
+nzvtest <- nearZeroVar(test, saveMetrics=T)
+newtest <- test[, nzvtest$nzv==F]
+```
+
+Now it is important to extract the columns that are all NAs.
+```{r, echo=TRUE}
+naindex<- sapply(newtrain, function(x){sum(is.na(x))})
+newtrain<- newtrain[ ,naindex==F]
+naindex<- sapply(newtest, function(x){sum(is.na(x))})
+newtest<- newtest[ ,naindex==F]
+str(newtrain)
+#dim(newtest)
+```
+
+##Create a Cross Validation set
+
+We now create a cross validation set with 30% of the train data set
+
+```{r, echo=TRUE}
+newtrain2 <- createDataPartition(y=newtrain$classe, p=0.7, list = F)
+newtrain <- newtrain[newtrain2, ]
+newvalidation <- newtrain[-newtrain2, ]
+
+```
+
+##Decision Tree Model
+
+Creating a Decision Tree model:
+
+```{r, echo=TRUE}
+modeltree<- train(classe ~., method="rpart", data=newtrain)
+fancyRpartPlot(modeltree$finalModel)
+```
+
+##Testing the Decision Tree model in the Training set and in the Cross Validation set
+
+Now we use the ConfusionMatrix function to analyse the model with the train set:
+
+```{r, echo=TRUE}
+prediction1 <- predict(modeltree, newdata = newtrain)
+confusionMatrix(prediction1, newtrain$classe)
+```
+
+And the valitation set
+
+```{r, echo=TRUE}
+prediction2 <- predict(modeltree, newvalidation)
+confusionMatrix(prediction2, newvalidation$classe)
+```
+
+##Randon Forest Model
+
+We will now create a randon forest model to predict classe agaisnt all other variables
+
+```{r, echo=TRUE}
+modelrf<- randomForest(classe ~., data=newtrain)
+```
+
+##Testing the model in the Training set and in the Cross Validation set
+
+Now we use the ConfusionMatrix function to analyse the model with the train set:
+
+```{r, echo=TRUE}
+prediction1 <- predict(modelrf, newdata = newtrain)
+confusionMatrix(prediction1, newtrain$classe)
+```
+
+And the valitation set
+
+```{r, echo=TRUE}
+prediction2 <- predict(modelrf, newvalidation)
+confusionMatrix(prediction2, newvalidation$classe)
+```
+
+##Generating Answers 
+
+we will use the Randon Forest model which had better results according to the confusionMatrix function.
+
+```{r, echo=TRUE}
+newnewtrain<- newtrain
+newnewtrain$classe<- NULL
+remove<- colnames(newnewtrain)
+newtest<- test[remove]
+#newtest<- cbind(newtest, test$problem_id)
+prediction3 <- predict(modelrf, newtest)
+prediction3
+```
+
+```{r, echo=TRUE}
+prediction3<-rbind(as.character(prediction3), test$problem_id)
+n<-20
+pml_write_files = function(x){
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(prediction3)
+#prediction3
+```
+
+
