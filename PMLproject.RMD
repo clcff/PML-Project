@@ -145,12 +145,12 @@ prediction3
 ```
 
 ```{r, echo=TRUE}
-prediction3<-rbind(as.character(prediction3), test$problem_id)
+#prediction3<-cbind(as.character(prediction3), test$problem_id)
 n<-20
 pml_write_files = function(x){
   for(i in 1:n){
     filename = paste0("problem_id_",i,".txt")
-    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+   write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
   }
 }
 
